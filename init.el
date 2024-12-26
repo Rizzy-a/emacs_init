@@ -100,7 +100,7 @@
 (global-set-key (kbd "C-c ;") #'smex)
 (global-set-key (kbd "M-X") #'smex-major-mode-commands)
 (global-set-key (kbd "C-c g") 'hydra-magit/body)
-
+(global-set-key (kbd "C-c r") 'my-repeatable-map)
 
 ;;; Native Minor Modes
 (transient-mark-mode 1)
@@ -217,6 +217,17 @@ _b_: Branch   _l_: Log
 ;;   :ensure t
 ;;   :config
 ;;   (mode-icons-mode 1))
+(use-package subr
+  :ensure nil
+  :config
+  (define-prefix-command 'my-repeatable-map))
+(use-package keymap
+  :ensure nil
+  :defer t
+  :config
+  (keymap-set my-repeatable-map (kbd "}") 'enlarge-window-horizontally))
+ 
+;; End of third party packages --------------------------------
 
 
 ;;; Native Major Modes 
@@ -300,7 +311,7 @@ _b_: Branch   _l_: Log
  :config
  (setq org-id-prefix "task"
        org-id-method 'uuid
-       bh/organization-task-id "eb155a82-92b2-4f25-a3c6-0304591af2f9"
+       bh/organization-task-id "eb155a82-92b2-4f25-a3c6-0304591af2f9" ; make a function that inserts a task-id automatically, maybe it already exists?
        org-id-link-to-org-use-id 'create-if-interactive-and-no-custom-id))
 
  
