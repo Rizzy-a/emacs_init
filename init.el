@@ -61,11 +61,43 @@
             (if (and (equal major-mode 'org-mode) (not (org-before-first-heading-p)) (eq arg 4))
                   (org-clock-in '(16))
                 (bh/clock-in-organization-task-as-default)))))
+  (defun bh/punch-out ()
+    (interactive)
+    (setq bh/keep-clock-running nil)
+    (when (org-clock-is-active)
+      (org-clock-out))
+    (org-agenda-remove-restriction-lock))
 
+(defun bh/clock-in-last-task (arg)
+  "Clock in the interrupted task if there is one
+Skip the default task and get the next one.
+A prefix arg forces clock in of the default task."
+  (interactive "p")
+  (let ((clock-in-to-task
+         (cond
+          ((eq arg 4) org-clock-default-task)
+          ((and (org-clock-is-active)
+                (equal org-clock-default-task (cadr org-clock-history)))
+           (caddr org-clock-history))
+          ((org-clock-is-active) (cadr org-clock-history))
+          ((equal org-clock-default-task (car org-clock-history)) (cadr org-clock-history))
+          (t (car org-clock-history)))))
+    (widen)
+    (org-with-point-at clock-in-to-task
+      (org-clock-in nil))))
+
+;; Remove empty LOGBOOK drawers on clock out
+(defun bh/remove-empty-drawer-on-clock-out ()
+  (interactive)
+  (save-excursion
+    (beginning-of-line 0)
+    (org-remove-empty-drawer-at "LOGBOOK" (point))))
+
+(add-hook 'org-clock-out-hook 'bh/remove-empty-drawer-on-clock-out 'append)
 
 ;;; Global keybindings  
 (global-set-key (kbd "C-c h") #'help-for-help)
-(global-set-key (kbd "C-c r") #'isearch-backward)
+;(global-set-key (kbd "C-c r") #'isearch-backward)
 (global-set-key (kbd "<f12>") #'org-agenda)
 (global-set-key (kbd "<f5>") #'bh/org-todo)
 (global-set-key (kbd "<S-f5>") #'bh/widen)
@@ -100,7 +132,6 @@
 (global-set-key (kbd "C-c ;") #'smex)
 (global-set-key (kbd "M-X") #'smex-major-mode-commands)
 (global-set-key (kbd "C-c g") 'hydra-magit/body)
-(global-set-key (kbd "C-c r") 'my-repeatable-map)
 
 ;;; Native Minor Modes
 (transient-mark-mode 1)
@@ -108,7 +139,6 @@
 (global-hl-line-mode 1)
 (use-package faces
   :ensure nil
-  :defer t 
   :config 
   (set-face-background 'hl-line "magenta")
   (set-face-background 'magit-section-highlight "magenta")
@@ -131,13 +161,12 @@
   :config
   (evil-commentary-mode 1))
 
-(use-package evil-core
-  :ensure nil
-  :defer t
-  :after evil
-  :config
-  (when (bound-and-true-p org-capture-mode)
-    (evil-define-key '(normal insert visual) org-capture-mode-map "C-c C-c" 'org-capture-finalize)))
+;; (use-package evil-core
+;;   :ensure nil
+;;   :after evil
+;;   :config
+;;   (when (bound-and-true-p org-capture-mode)
+;;     (evil-define-key '(normal insert visual)  org-capture-mode-map "C-c C-c" 'org-capture-finalize)))
 (use-package ido-completing-read+
   :ensure t
   :defer t
@@ -217,16 +246,7 @@ _b_: Branch   _l_: Log
 ;;   :ensure t
 ;;   :config
 ;;   (mode-icons-mode 1))
-(use-package subr
-  :ensure nil
-  :config
-  (define-prefix-command 'my-repeatable-map))
-(use-package keymap
-  :ensure nil
-  :defer t
-  :config
-  (keymap-set my-repeatable-map (kbd "}") 'enlarge-window-horizontally))
- 
+
 ;; End of third party packages --------------------------------
 
 
@@ -259,10 +279,17 @@ _b_: Branch   _l_: Log
         org-agenda-text-search-extra-files (quote (agenda-archives))
 	org-log-into-drawer t
         org-enforce-todo-dependencies t
+	org-use-fast-todo-selection t
 	org-insert-heading-respect-content nil
 	org-reverse-note-order nil
 	org-deadline-warning-days 30
 	org-tags-match-list-sublevels t
+	org-log-done (quote time)
+	org-log-state-notes-insert-after-drawers nil
+	org-todo-keywords
+         (quote ((sequence "TODO(t)" "NEXT(n)" "|" "DONE(d)")
+              (sequence "WAITING(w@/!)" "HOLD(h@/!)" "|" "CANCELLED(c@/!)" "PHONE" "MEETING")))
+
         org-tag-alist (quote ((:startgroup) ; tags with fast selection keys
                             ("@errand" . ?e)
                             ("@office" . ?o)
@@ -280,12 +307,21 @@ _b_: Branch   _l_: Log
                             ("NOTE" . ?n)
                             ("CANCELLED" . ?c)
                             ("FLAGGED" . ??)))
+	org-todo-state-tags-triggers
+         (quote (("CANCELLED" ("CANCELLED" . t))
+                 ("WAITING" ("WAITING" . t))
+                 ("HOLD" ("WAITING" . t) ("HOLD" . t))
+                 (done ("WAITING") ("HOLD"))
+                 ("TODO" ("WAITING") ("CANCELLED") ("HOLD"))
+                 ("NEXT" ("WAITING") ("CANCELLED") ("HOLD"))
+                 ("DONE" ("WAITING") ("CANCELLED") ("HOLD"))))
+
+	
         org-directory "~/git/org"
 	org-default-notes-file "~/git/org/refile.org"
 	org-startup-folded t
-	org-read-date-prefer-future 'time))    
-    ;; ---------- Org Tag function definitions ------------------------------
-    ;; NEXT keywords are for tasks and not projects, any parent tasks marked NEXT automagically change change from NEXT to TODO since they are now projects and not tasks.
+	org-read-date-prefer-future 'time))
+
     
 (use-package org-clock
   :ensure nil
@@ -296,8 +332,8 @@ _b_: Branch   _l_: Log
    org-clock-out-remove-zero-time-clocks t
    org-clock-out-when-done t
    org-clock-persist t 
-   org-clock-persist-query-resume t ; Do not prompt to resume an active clock
-   org-clock-auto-clock-resolution t;(quote when-no-clock-is-running) ; Enable automatically finding open clocks
+   org-clock-persist-query-resume nil ; Do not prompt to resume an active clock
+   org-clock-auto-clock-resolution (quote when-no-clock-is-running) ; Enable automatically finding open clocks
    org-clock-report-include-clocking-task t ; Include current clocking task in clock reports
    org-clock-history-length 23 ; So it's easy to pick items off the C-F11 list
    org-clock-in-resume t 
@@ -313,7 +349,6 @@ _b_: Branch   _l_: Log
        org-id-method 'uuid
        bh/organization-task-id "eb155a82-92b2-4f25-a3c6-0304591af2f9" ; make a function that inserts a task-id automatically, maybe it already exists?
        org-id-link-to-org-use-id 'create-if-interactive-and-no-custom-id))
-
  
 (use-package org-agenda
  :ensure nil
@@ -374,7 +409,7 @@ _b_: Branch   _l_: Log
                             (org-tags-match-list-sublevels 'indented)
                             (org-agenda-sorting-strategy
                              '(category-keep))))
-                (tags-todo "-CANCELLED/!NEXT"
+               (tags-todo "-CANCELLED/!NEXT"
                            ((org-agenda-overriding-header (concat "Project Next Tasks"
                                                                   (if bh/hide-scheduled-and-waiting-next-tasks
                                                                       ""
@@ -604,8 +639,23 @@ Late deadlines first, then scheduled, then non-late deadlines"
               ("p" "Phone call" entry (file "~/git/org/refile.org")
                "* PHONE %? :PHONE:\n%U" :clock-in t :clock-resume t)
               ("h" "Habit" entry (file "~/git/org/refile.org")
-               "* NEXT %?\n%U\n%a\nSCHEDULED: %(format-time-string \"%<<%Y-%m-%d %a .+1d/3d>>\")\n:PROPERTIES:\n:STYLE: habit\n:REPEAT_TO_STATE: NEXT\n:END:\n")))))
- 
+               "* NEXT %?\n%U\n%a\nSCHEDULED: %(format-time-string \"%<<%Y-%m-%d %a .+1d/3d>>\")\n:PROPERTIES:\n:STYLE: habit\n:REPEAT_TO_STATE: NEXT\n:END:\n"))))
+    (when (bound-and-true-p org-capture-mode)
+    (evil-define-key '(normal insert visual)  org-capture-mode-map "C-c C-c" 'org-capture-finalize)))
+(use-package org-faces
+  :ensure nil
+  :after org
+  :config
+  (setq org-todo-keyword-faces
+      (quote (("TODO" :foreground "red" :weight bold)
+              ("NEXT" :foreground "blue" :weight bold)
+              ("DONE" :foreground "forest green" :weight bold)
+              ("WAITING" :foreground "orange" :weight bold)
+              ("HOLD" :foreground "magenta" :weight bold)
+              ("CANCELLED" :foreground "forest green" :weight bold)
+              ("MEETING" :foreground "forest green" :weight bold)
+              ("PHONE" :foreground "forest green" :weight bold)))))
+
 (use-package ol
   :ensure nil
   :defer t
