@@ -707,8 +707,8 @@ so change the default 'F' binding in the agenda to allow both"
   (setq evil-want-keybinding nil)
   (evil-mode 1)
   :config
-  (evil-define-key 'insert 'global (kbd "C-c n") 'evil-normal-state)) 
-(use-package evil-commentary
+  (evil-define-key 'insert 'global "\\" 'evil-normal-state))
+ (use-package evil-commentary
   :ensure t
   :after evil
   :config
@@ -746,7 +746,7 @@ so change the default 'F' binding in the agenda to allow both"
   )
 (use-package evil-collection
   :ensure t
-  :after (evil magit)
+  :after (magit)
   :config
   (evil-collection-init 'magit))
 (use-package keyfreq
@@ -827,6 +827,7 @@ _b_: Branch   _l_: Log
 	org-use-fast-todo-selection t
 	org-insert-heading-respect-content nil
 	org-reverse-note-order nil
+	org-time-stamp-rounding-minutes (quote (1 1))
 	org-deadline-warning-days 30
         org-archive-mark-done nil
         org-archive-location "%s_archive::* Archived Tasks"
@@ -844,15 +845,12 @@ _b_: Branch   _l_: Log
                             ("@errand" . ?e)
                             ("@office" . ?o)
                             ("@home" . ?H)
-                            ("@farm" . ?f)
+			    ("@geography" . ?g)
                             (:endgroup)
                             ("WAITING" . ?w)
                             ("HOLD" . ?h)
                             ("PERSONAL" . ?P)
                             ("WORK" . ?W)
-                            ("FARM" . ?F)
-                            ("ORG" . ?O)
-                            ("NORANG" . ?N)
                             ("crypt" . ?E)
                             ("NOTE" . ?n)
                             ("CANCELLED" . ?c)
@@ -930,7 +928,7 @@ _b_: Branch   _l_: Log
        org-agenda-skip-timestamp-if-done t
        org-agenda-include-diary nil
        org-agenda-diary-file "~/git/org/diary.org"
-     org-agenda-show-all-dates t
+       org-agenda-show-all-dates t
        org-agenda-show-future-repeats t
        org-stuck-projects (quote ("" nil nil ""))
        org-agenda-sorting-strategy
@@ -938,6 +936,11 @@ _b_: Branch   _l_: Log
               (todo category-up effort-up)
               (tags category-up effort-up)
               (search category-up)))
+       org-agenda-clock-consistency-checks
+        (quote (:max-duration "4:00"
+              :min-duration 0
+              :max-gap 0
+              :gap-ok-around ("4:00")))
        org-agenda-start-on-weekday 1
        org-agenda-timegrid-use-ampm t
        org-agenda-time-grid (quote ((daily today require-timed)
@@ -1214,6 +1217,19 @@ Late deadlines first, then scheduled, then non-late deadlines"
   :config
   (keymap-set org-mode-map "C-c l" 'org-store-link))
 
+(use-package org-habit
+  :ensure nil
+  :after org
+  :config
+  (setq org-habit-graph-column 50)
+  (run-at-time "06:00" 86400 '(lambda () (setq org-habit-show-habits t))))
+
+
+(use-package dired
+  :ensure nil
+  :config
+  (keymap-set dired-mode-map "C-c m" 'dired-mark))
+;---- end of native major modes -----
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
@@ -1227,3 +1243,4 @@ Late deadlines first, then scheduled, then non-late deadlines"
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
   '(org-mode-line-clock ((t (:background "grey75" :foreground "red" :box (:line-width -1 :style released-button)))) t))
+(put 'erase-buffer 'disabled nil)
