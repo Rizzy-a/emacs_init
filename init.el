@@ -28,7 +28,11 @@
 
 (setq inhibit-splash-screen t) ; 0/t == on/off)
 (setq-default org-display-custom-times t)
-
+(setq mode-line-format '("%e" mode-line-front-space
+			 (:propertize ("" mode-line-mule-info mode-line-client mode-line-modified mode-line-remote) display (min-width (5.0)))
+			 mode-line-frame-identification mode-line-buffer-identification "   "       mode-line-position evil-mode-line-tag (vc-mode vc-mode) "  " mode-line-misc-info mode-line-end-spaces))
+;;  add this where you want it listed above for major/minor modes mode-line-modes 
+;; end of mode-line-format orginal value
 ;;; Global 3rd party package variables
 
 ;;; Global User Variables
@@ -632,6 +636,14 @@ so change the default 'F' binding in the agenda to allow both"
   (interactive)
   (insert "#+BEGIN: columnview :hlines 1 :id local\n#+END:\n"))
 
+;;;; Refile settings
+; Exclude DONE state tasks from refile targets
+(defun bh/verify-refile-target ()
+  "Exclude todo keywords with a done state from refile targets"
+  (not (member (nth 2 (org-heading-components)) org-done-keywords)))
+
+(setq org-refile-target-verify-function 'bh/verify-refile-target)
+
 
 (defun bh/org-auto-exclude-function (tag)
   "Automatic task exclusion in the agenda with / RET"
@@ -680,17 +692,17 @@ so change the default 'F' binding in the agenda to allow both"
 (global-set-key (kbd "C-c ;") #'smex)
 (global-set-key (kbd "M-X") #'smex-major-mode-commands)
 (global-set-key (kbd "C-c g") 'hydra-magit/body)
-
+(global-set-key (kbd "C-c C-x s") 'org-insert-subheading)
 ;;; Native Minor Modes
 (transient-mark-mode 1)
 (global-visual-line-mode 1)
 (global-hl-line-mode 1)
 (use-package faces
   :ensure nil
-  :config 
-  (set-face-background 'hl-line "magenta")
+  :init 
+  (set-face-background 'hl-line "0")
   (set-face-background 'magit-section-highlight "magenta")
-  (set-face-foreground 'hl-line "color-193")
+  (set-face-foreground 'hl-line "0")
   (set-face-foreground 'org-hide "black"))
 
 (use-package tab-bar
@@ -707,13 +719,28 @@ so change the default 'F' binding in the agenda to allow both"
   (setq evil-want-keybinding nil)
   (evil-mode 1)
   :config
-  (evil-define-key 'insert 'global "\\" 'evil-normal-state))
+  (evil-define-key '(insert visual) 'global (kbd "C-c \\") 'evil-normal-state) 
+  (evil-define-key '(insert visual) 'global "|" nil)
+  (evil-define-key '(normal visual) 'global (kbd "C-c +")
+                 'evil-numbers/inc-at-pt)
+  (evil-define-key '(normal visual) 'global (kbd "C-c -")
+                   'evil-numbers/dec-at-pt)
+  (evil-define-key '(normal visual) 'global (kbd "C-c C-+")
+                   'evil-numbers/inc-at-pt-incremental)
+  (evil-define-key '(normal visual) 'global (kbd "C-c C--")
+                   'evil-numbers/dec-at-pt-incremental))
+
+
  (use-package evil-commentary
   :ensure t
   :after evil
   :config
   (evil-commentary-mode 1))
 
+(use-package evil-numbers
+  :ensure t
+  :after evil
+  )
 ;; (use-package evil-core
 ;;   :ensure nil
 ;;   :after evil
@@ -746,7 +773,7 @@ so change the default 'F' binding in the agenda to allow both"
   )
 (use-package evil-collection
   :ensure t
-  :after (magit)
+;  :after (magit)
   :config
   (evil-collection-init 'magit))
 (use-package keyfreq
@@ -808,7 +835,10 @@ _b_: Branch   _l_: Log
   (keymap-unset org-mode-map "C-c ;")
   ;;--------------------------------------------
   :config  
-    (setq org-use-sub-superscripts nil
+(setq   org-use-sub-superscripts nil
+        org-modules (quote (org-habit
+			    org-crypt))
+
         org-odd-levels-only nil 
         org-enable-priority-commands t ; priorities A-E
         org-default-priority ?E ; Tasks w/out a specific priority are lowest priority E.
@@ -834,7 +864,7 @@ _b_: Branch   _l_: Log
         org-tags-match-list-sublevels t
 	org-log-done (quote time)
         org-columns-default-format "%80ITEM(Task) %10Effort(Effort){:} %10CLOCKSUM"
-	org-global-properties (quote (("Effort_ALL" . "0:15 0:30 0:45 1:00 2:00 3:00 4:00 5:00 6:00 0:00")
+	org-global-properties (quote (("Effort_ALL" . "0:15 0:30 0:45 1:00 2:00 3:00 4:00 5:00 6:00 0:00")   
                                     ("STYLE_ALL" . "habit")))
 	org-log-state-notes-insert-after-drawers nil
 	org-todo-keywords
@@ -846,6 +876,9 @@ _b_: Branch   _l_: Log
                             ("@office" . ?o)
                             ("@home" . ?H)
 			    ("@geography" . ?g)
+			    ("section-1" . ?s)
+			    ("section-2" . ?S)
+			    ("section-3" . ?Z)
                             (:endgroup)
                             ("WAITING" . ?w)
                             ("HOLD" . ?h)
@@ -918,7 +951,7 @@ _b_: Branch   _l_: Log
        org-agenda-clockreport-parameter-plist (quote (:link t :maxlevel 5 :fileskip0 t :compact t :narrow 80))
        org-agenda-auto-exclude-function 'bh/org-auto-exclude-function
        org-agenda-tags-todo-honor-ignore-options t
-       org-agenda-skip-additional-timestamps-same-entry t
+       org-agenda-skip-additional-timestamps-same-entry nil
        org-agenda-todo-ignore-with-date nil
        org-agenda-todo-ignore-deadlines nil
        org-agenda-todo-ignore-scheduled nil
@@ -1135,6 +1168,15 @@ Late deadlines first, then scheduled, then non-late deadlines"
   :config
   (setq org-startup-indented t))
 
+;; (use-package org-crypt
+;;   :ensure nil
+;;   :after org
+;;   :config
+;;   (org-crypt-use-before-save-magic)
+;;   (setq org-tags-exclude-from-inheritance (quote ("crypt"))
+;; 	org-crypt-disable-auto-save "encrypt"
+;; 	org-crypt-key "F0B66B40"))
+  
 (use-package org-cycle
   :ensure nil
   :after org
@@ -1221,7 +1263,8 @@ Late deadlines first, then scheduled, then non-late deadlines"
   :ensure nil
   :after org
   :config
-  (setq org-habit-graph-column 50)
+  (setq org-habit-graph-column 65
+	org-habit-show-all-today t)
   (run-at-time "06:00" 86400 '(lambda () (setq org-habit-show-habits t))))
 
 
@@ -1236,11 +1279,11 @@ Late deadlines first, then scheduled, then non-late deadlines"
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
  '(package-selected-packages
-   '(org-checklist keyfreq evil-collection evil-core org-refile magit mode-icons use-package treesit-auto treemacs-evil smex pyvenv pyenv-mode lsp-ui lsp-pyright ido-completing-read+ evil-commentary envrc eglot direnv company bbdb)))
+   '(ccls org-checklist keyfreq evil-collection evil-core org-refile magit mode-icons use-package treesit-auto treemacs-evil smex pyvenv pyenv-mode lsp-ui lsp-pyright ido-completing-read+ evil-commentary envrc eglot direnv company bbdb)))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
-  '(org-mode-line-clock ((t (:background "grey75" :foreground "red" :box (:line-width -1 :style released-button)))) t))
+ '(org-mode-line-clock ((t (:background "grey75" :foreground "red" :box (:line-width -1 :style released-button))))))
 (put 'erase-buffer 'disabled nil)
